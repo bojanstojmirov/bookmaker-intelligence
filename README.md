@@ -21,7 +21,7 @@ streamlit run dashboard.py - // - it will open a browser window at: http://local
 The information shown in this project is collected using web scraping techniques from the official bookmaker websites:
 
 - [Bet365 - About Us](https://help.bet365.com/en/about-us)
-- [Betsson - Corporate Information](https://www.betssongroup.com/about-us/)
+- [Betsson - Corporate Information](https://info.betsson.com/about/en/)
 
 Some assumptions were made:
 - Headquarters country was assumed based on context
