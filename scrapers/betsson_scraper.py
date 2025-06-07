@@ -1,28 +1,14 @@
-import os, time, re
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from .utils import init_driver, get_and_sleep, regex_match, append_if_found
 
 class BetssonScraper:
     def __init__(self):
-        options = Options()
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        chrome_driver_path = os.path.join(current_dir, "chromedriver")
-
-        self.driver = webdriver.Chrome(
-            service=Service(chrome_driver_path),
-            options=options
-        )
+        self.driver = init_driver()
 
     def scrape(self):
         about_us_url = "https://info.betsson.com/about/en/"
         try:
-            self.driver.get(about_us_url)
-            time.sleep(5)
+            get_and_sleep(self.driver, about_us_url)
 
             about_text = self.driver.find_element(By.XPATH, "//h2[contains(., 'COMPANY INFORMATION')]/parent::span/parent::div/following-sibling::div/following-sibling::div/p").text
             hq_text = self.driver.find_element(By.XPATH, "//h2[contains(., 'BML Group')]/parent::span/parent::div/following-sibling::div/following-sibling::div/p/b").text
@@ -30,43 +16,29 @@ class BetssonScraper:
             investors_url = self.driver.find_element(By.XPATH, "//h3[contains(., 'Investor Relations')]/following-sibling::p/following-sibling::div/a").get_attribute('href')
 
             products = []
-            if "sportsbook" in about_text:
-                products.append("Sportsbook betting")
-            if "casino" in about_text:
-                products.append("Casino")
-            if "poker" in about_text:
-                products.append("Poker")
-            if "bingo" in about_text:
-                products.append("Bingo")
-            if "scratch tickets" in about_text:
-                products.append("Scratch tickets")
+            for product in ["sportsbook", "casino", "poker", "bingo", "scratch tickets"]:
+                append_if_found(about_text, product, product, products)
 
-            if "Malta" in hq_text:
-                country_hq = "Malta"
+            country_hq = "Malta" if "Malta" in hq_text else None
             
-            self.driver.get(licenses_url)
-            time.sleep(5)
+            get_and_sleep(self.driver, licenses_url)
             licensing_text = self.driver.find_element(By.XPATH, "//p[contains(., 'holds a license issued by')]").text
 
             licensing = []
-            if "MGA" in licensing_text or "Malta Gaming Authority" in licensing_text:
-                licensing.append("Malta Gaming Authority")
-            if "UK Gambling Commission" in licensing_text or "UKGC" in licensing_text:
-                licensing.append("UKGC")
+            for license_ in ["MGA", "Malta Gaming Authority", "UK Gambling Commission", "UKGC"]:
+                append_if_found(licensing_text, license_, license_, licensing)
 
-            match = re.search(r"licen[cs]e\s+([A-Z]+\/[A-Z]+\/\d+\/\d+) issued by", licensing_text)
-            if match:
-                license_code = match.group(1)
+            license_code = regex_match(licensing_text, r"employs over ([\d,]+) people", "+")
+            if license_code:
                 licensing.append(license_code)
 
-            self.driver.get(investors_url)
-            time.sleep(5)
+            get_and_sleep(self.driver, investors_url)
 
             stats_box = self.driver.find_element(By.XPATH, "//div[contains(., 'About us')]/parent::div/parent::div/parent::div/following-sibling::div/div/div")
             revenue_estimate = stats_box.find_element(By.XPATH, ".//div/div/div").text + " MEUR REVENUE 2024"
             customer_base = stats_box.find_element(By.XPATH, ".//div/following-sibling::div/div/div").text + " ACTIVE CUSTOMERS Q4 2024"
 
-            data = {
+            return {
                 "bookmaker_name": "Betsson",
                 "country": country_hq,
                 "products": products,
@@ -75,8 +47,6 @@ class BetssonScraper:
                 "revenue_estimate": revenue_estimate,
                 "source_url": about_us_url,
             }
-
-            return data
 
         except Exception as e:
             print(f"[SCRAPING FAILED] error for Bet365: {e}")

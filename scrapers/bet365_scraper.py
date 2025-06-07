@@ -1,69 +1,31 @@
-import os, time, re
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from .utils import init_driver, get_and_sleep, regex_match, append_if_found
 
 class Bet365Scraper:
     def __init__(self):
-        options = Options()
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        chrome_driver_path = os.path.join(current_dir, "chromedriver")
-
-        self.driver = webdriver.Chrome(
-            service=Service(chrome_driver_path),
-            options=options
-        )
+        self.driver = init_driver()
 
     def scrape(self):
         about_us_url = "https://help.bet365.com/en/about-us"
         try:
-            self.driver.get(about_us_url)
-            time.sleep(5)
+            get_and_sleep(self.driver, about_us_url)
 
             about_text = self.driver.find_element(By.XPATH, "//div[@class='sa__singleaccordion__section__body']").text
 
-            products = []
-            if "Sports" in about_text:
-                products.append("Sports")
-            if "Casino" in about_text:
-                products.append("Casino")
-            if "Live Casino" in about_text:
-                products.append("Live Casino")
-            if "Poker" in about_text:
-                products.append("Poker")
-            if "Bingo" in about_text:
-                products.append("Bingo")
-            
-            if "Gibraltar" in about_text:
-                country_hq = "Gibraltar"
+            products, licensing = [], []
+            for product in ["Sports", "Casino", "Live Casino", "Poker", "Bingo"]:
+                append_if_found(about_text, product, product, products)
 
-            licensing = []
-            if "Government of Gibraltar" in about_text:
-                licensing.append("Government of Gibraltar")
-            if "Gibraltar Gambling Commissioner" in about_text:
-                licensing.append("Gibraltar Gambling Commissioner")
-            if "UK Gambling Commission" in about_text or "UKGC" in about_text:
-                licensing.append("UKGC")
+            for license_ in ["Government of Gibraltar", "Gibraltar Gambling Commissioner", "UKGC"]:
+                append_if_found(about_text, license_, license_, licensing)
 
-            if "eCOGRA" in about_text:
-                affiliates ="eCOGRA"
-            
-            if "Thawte SSL" in about_text:
-                security_certifications = "Thawte SSL Web Server Certificate"
+            country_hq = "Gibraltar" if "Gibraltar" in about_text else None
+            affiliates = "eCOGRA" if "eCOGRA" in about_text else None
+            security_certifications = "Thawte SSL Web Server Certificate" if "Thawte SSL" in about_text else None
+            customer_base = regex_match(about_text, r"over ([\d,]+) million customers worldwide", " M+")
+            num_of_employees = regex_match(about_text, r"employs over ([\d,]+) people", "+")
 
-            match = re.search(r"employs over ([\d,]+) people", about_text)
-            if match:
-                num_of_employees = match.group(1) + '+'
-            
-            match = re.search(r"over ([\d,]+) million customers worldwide", about_text)
-            if match:
-                customer_base = match.group(1) + ' M+'
-
-            data = {
+            return {
                 "bookmaker_name": "Bet365",
                 "country": country_hq,
                 "products": products,
@@ -73,9 +35,7 @@ class Bet365Scraper:
                 "employees": num_of_employees,
                 "security_certifications": security_certifications,
                 "source_url": about_us_url
-                }
-
-            return data
+            }
 
         except Exception as e:
             print(f"[SCRAPING FAILED] error for Bet365: {e}")
